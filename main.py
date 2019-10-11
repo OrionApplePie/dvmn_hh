@@ -129,6 +129,7 @@ def calc_average_salary_language(lang=""):
 
 
 def main():
+    
     avg_salaries = []
 
     for lang in PROGRAMMING_LANGUAGES:
@@ -147,3 +148,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+ 
