@@ -36,7 +36,7 @@ def get_vacancies(search_text="", page=0):
 
     response = requests.get(
         url=url,
-        params=query_params 
+        params=query_params
     )
     response.raise_for_status()
 
@@ -64,10 +64,10 @@ def predict_rub_salary(vacancy=None):
         average_salary = (salary_from + salary_to) / 2
 
     if salary_from is not None and salary_to is None:
-        average_salary = salary_from * 1.2 
+        average_salary = salary_from * 1.2
 
     if salary_from is None and salary_to is not None:
-        average_salary = salary_to * 0.8 
+        average_salary = salary_to * 0.8
 
     return int(average_salary)
 
@@ -77,6 +77,7 @@ def get_vacancies_found_number(search_text=""):
     response = get_vacancies(
         search_text=search_text,
     )
+    response.raise_for_status()
     return int(
         response.json()["found"]
     )
@@ -90,6 +91,8 @@ def fetch_all_vacancies(search_text="", start_page=0):
             search_text=search_text,
             page=page
         )
+        response.raise_for_status()
+
         page_data = response.json()
 
         if page >= page_data["pages"] - 1:
@@ -129,7 +132,6 @@ def calc_average_salary_language(lang=""):
 
 
 def main():
-    
     avg_salaries = []
 
     for lang in PROGRAMMING_LANGUAGES:
@@ -146,6 +148,6 @@ def main():
                  f' avg salary: {info["average_salary"]} ')
             )
 
+
 if __name__ == "__main__":
     main()
- 
