@@ -66,7 +66,7 @@ def predict_salary(salary_from, salary_to):
 
 
 def predict_rub_salary_hh(vacancy=None):
-    """Calculate average salary of given vacancy
+    """Calculate average salary of given hh vacancy
     or return None if no information of salary.
     Process only if currency is RUR."""
 
@@ -80,11 +80,12 @@ def predict_rub_salary_hh(vacancy=None):
 
     salary_from = salary["from"]
     salary_to = salary["to"]
-    average_salary = predict_salary(salary_from, salary_to)
 
-    return int(average_salary)
+    return int(
+        predict_salary(salary_from, salary_to)
+    )
 
-
+# TODO: нужна ли эта функция?
 def get_vacancies_found_number_hh(search_text=""):
     """Get number of found vacancies by search text."""
     response = get_vacancies_hh(
@@ -144,7 +145,7 @@ def calc_average_salary_language_hh(lang=""):
     }
 
 
-def fetch_all_vacancies_sj():
+def fetch_all_vacancies_sj(search_text=""):
     secret_key = os.getenv("SUPERJOB_SECRET_KEY")
     app_id = os.getenv("APP_ID")
     login = os.getenv("LOGIN")
@@ -172,11 +173,11 @@ def fetch_all_vacancies_sj():
     vacancies_params = {
         "town": SUPERJOB_MOSKOW_ID,
         "date_published_from": month_ago_date,
-        # "keyword": "",
-        "keywords": [[1, None, "программист"], ],
+        "keyword": search_text,
+        # "keywords": [[1, None, search_text], ],
         "catalogues": 48,
-        # "page": 1,
-        "count": 200,
+        "page": 5,
+        "count": 100,
     }
     vacancies = requests.get(
         url=SUPERJOB_VACANCIES_SEARCH_URL,
@@ -198,28 +199,64 @@ def fetch_all_vacancies_sj():
     return res["objects"]
 
 
-def predict_rub_salary_sj(vacancy):
+def predict_rub_salary_sj(vacancy=None):
     salary_from = vacancy["payment_from"]
     salary_to = vacancy["payment_to"]
-    return predict_salary(salary_from, salary_to)
+
+    if salary_from == salary_to == 0:
+        return None
+    if not salary_from or not salary_to:
+        return None
+
+    return int(
+        predict_salary(salary_from, salary_to)
+    )
+
+
+def calc_average_salary_language_sj(lang=""):
+    search_text = lang
+
+    vacancies = fetch_all_vacancies_sj(search_text)
+    average_salary = 0
+    processed_vacancies = 0
+
+    vacancies_with_salary = [
+        predict_rub_salary_sj(vacancy)
+        for vacancy in vacancies
+        if predict_rub_salary_sj(vacancy)
+    ]
+
+    average_salary = int(
+        sum(vacancies_with_salary) / len(vacancies_with_salary)
+    )
+
+    return {
+        f"{lang}": {
+            "vacancies_found": len(vacancies),
+            "vacancies_processed": len(vacancies_with_salary),
+            "average_salary": average_salary
+        }
+    }
 
 
 def main():
-    avg_salaries = []
+    # avg_salaries = []
 
-    for lang in PROGRAMMING_LANGUAGES:
-        avg_salaries.append(
-            calc_average_salary_language_hh(lang=lang)
-        )
+    # for lang in PROGRAMMING_LANGUAGES:
+    #     avg_salaries.append(
+    #         calc_average_salary_language_hh(lang=lang)
+    #     )
 
-    for lang_salary in avg_salaries:
-        for name in lang_salary.keys():
-            info = lang_salary[name]
-            print(
-                (f'{name} / found: {info["vacancies_found"]} /'
-                 f' processed: {info["vacancies_processed"]} /'
-                 f' avg salary: {info["average_salary"]} ')
-            )
+    # for lang_salary in avg_salaries:
+    #     for name in lang_salary.keys():
+    #         info = lang_salary[name]
+    #         print(
+    #             (f'{name} / found: {info["vacancies_found"]} /'
+    #              f' processed: {info["vacancies_processed"]} /'
+    #              f' avg salary: {info["average_salary"]} ')
+    #         )
+    python_vacancies = calc_average_salary_language_sj("Python")
+    print(python_vacancies)
 
 
 if __name__ == "__main__":
