@@ -180,36 +180,40 @@ def predict_rub_salary_sj(vacancy=None):
     salary_from = vacancy["payment_from"]
     salary_to = vacancy["payment_to"]
 
-    if salary_from == salary_to == 0:
-        return None
     if not salary_from or not salary_to:
         return None
+    if vacancy["currency"] != "rub":
+        return None
 
-    return int(_predict_salary(salary_from, salary_to))
+    return int(_predict_salary(salary_from, salary_to)) or None
 
 
 def calc_average_salary_language_sj(lang=""):
     search_text = lang
 
-    response = fetch_all_vacancies_sj(search_text)
+    vacancies = fetch_all_vacancies_sj(search_text)
     average_salary = 0
     processed_vacancies = 0
 
-    vacancies_with_salary = [
+    predicted_data = [
         predict_rub_salary_sj(vacancy)
-        for vacancy in response
-        if predict_rub_salary_sj(vacancy)
+        for vacancy in vacancies
     ]
+    predicted_salaries = list(filter(None, predicted_data))
+    predicted_salaries_number = len(predicted_salaries)
+    try:
+        average_salary = int(
+            sum(predicted_salaries) / predicted_salaries_number
+        )
+    except ZeroDivisionError:
+        average_salary = 0
 
-    average_salary = int(sum(vacancies_with_salary) / len(vacancies_with_salary))
-
-    return {
-        f"{lang}": {
-            "vacancies_found": len(response),
-            "vacancies_processed": len(vacancies_with_salary),
-            "average_salary": average_salary,
-        }
-    }
+    return  [
+        lang,
+        len(predicted_data),
+        predicted_salaries_number,
+        average_salary
+    ]
 
 
 def main():
