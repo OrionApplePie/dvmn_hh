@@ -77,18 +77,10 @@ def fetch_all_vacancies_hh(search_text="", start_page=0, pages_limith=12):
 
         page_data = response.json()
 
-        if page >= page_data["pages"] - 1 or page == pages_limith:
+        if page >= page_data["pages"] - 1:
             break
 
         yield from page_data["items"]
-
-
-# TODO: нужна ли эта функция?
-def _get_vacancies_found_number_hh(search_text=""):
-    """Get number of found response by search text."""
-    response = _get_vacancies_page_hh(search_text=search_text,)
-    response.raise_for_status()
-    return response.json()["found"]
 
 
 def predict_rub_salary_hh(vacancy=None):
@@ -107,31 +99,33 @@ def predict_rub_salary_hh(vacancy=None):
     salary_from = salary["from"]
     salary_to = salary["to"]
 
-    return int(_predict_salary(salary_from, salary_to))
+    return int(_predict_salary(salary_from, salary_to)) or None
 
 
 def calc_average_salary_language_hh(lang=""):
     """Caclculate average salary of response by given language."""
-
     search_text = lang
-    print(f"fetch {lang} response...")  # fix me!!!
-    vacancies_found = _get_vacancies_found_number_hh(search_text=search_text)
-    all_vacancies = fetch_all_vacancies_hh(search_text=search_text,)
+    all_vacancies = fetch_all_vacancies_hh(search_text=search_text)
 
-    vacancies_with_salary = [
+    predicted_data = [
         predict_rub_salary_hh(vacancy)
         for vacancy in all_vacancies
-        if predict_rub_salary_hh(vacancy) is not None
     ]
-    average_salary = int(sum(vacancies_with_salary) / len(vacancies_with_salary))
+    predicted_salaries = list(filter(None, predicted_data))
+    predicted_salaries_number = len(predicted_salaries)
+    try:
+        average_salary = int(
+            sum(predicted_salaries) / predicted_salaries_number
+        )
+    except ZeroDivisionError:
+        average_salary = 0
 
-    return {
-        f"{lang}": {
-            "vacancies_found": vacancies_found,
-            "vacancies_processed": len(vacancies_with_salary),
-            "average_salary": average_salary,
-        }
-    }
+    return  [
+        lang,
+        len(predicted_data),
+        predicted_salaries_number,
+        average_salary
+    ]
 
 
 def _auth_sj():
