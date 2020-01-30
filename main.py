@@ -68,10 +68,10 @@ def _get_vacancies_page_hh(search_text="", page=0):
     return response
 
 
-def fetch_all_vacancies_hh(search_text="", start_page=0, pages_limith=12):
+def fetch_all_vacancies_hh(search_text="", start_page=0):
     """Fetch all response from every pages. (API limit is 2000)."""
     for page in count(start_page):
-        print(f"fetch by search text: {search_text}, page: {page}")
+        # print(f"fetch by search text: {search_text}, page: {page}")
         response = _get_vacancies_page_hh(search_text=search_text, page=page)
         response.raise_for_status()
 
@@ -164,16 +164,21 @@ def fetch_all_vacancies_sj(search_text=""):
         "date_published_from": month_ago_date,
         "keyword": search_text,
         # "keywords": [[1, None, search_text], ],
-        "catalogues": SUPERJOB_CATALOG_CODE,
-        "page": 5,
+        # "catalogues": SUPERJOB_CATALOG_CODE,
+        "page": 0,
         "count": 100,
     }
-    response = requests.get(
-        url=SUPERJOB_VACANCIES_SEARCH_URL, headers=headers, params=params
-    )
-    response.raise_for_status()
+    for page in count(0):
+        if page > 4:
+            break
 
-    return response.json()["objects"]
+        params['page'] = page
+        response = requests.get(
+            url=SUPERJOB_VACANCIES_SEARCH_URL, headers=headers, params=params
+        )
+        response.raise_for_status()
+
+        yield from response.json()["objects"]
 
 
 def predict_rub_salary_sj(vacancy=None):
@@ -231,15 +236,17 @@ def print_table(data, title=None):
 
 
 def main():
-    avg_salaries_hh = _calc_average_salary_all_languages(
-        calc_func=calc_average_salary_language_hh
-    )
-    avg_salaries_sj = _calc_average_salary_all_languages(
-        calc_func=calc_average_salary_language_sj
-    )
+    r = calc_average_salary_language_sj("Менеджер по продажам")
+    print(r)
+    # avg_salaries_hh = _calc_average_salary_all_languages(
+    #     calc_func=calc_average_salary_language_hh
+    # )
+    # avg_salaries_sj = _calc_average_salary_all_languages(
+    #     calc_func=calc_average_salary_language_sj
+    # )
 
-    print_table(data=avg_salaries_hh, title="HeadHunter Moscow")
-    print_table(data=avg_salaries_sj, title="SuperJob Moscow")
+    # print_table(data=avg_salaries_hh, title="HeadHunter Moscow")
+    # print_table(data=avg_salaries_sj, title="SuperJob Moscow")
 
 
 if __name__ == "__main__":
