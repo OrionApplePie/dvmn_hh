@@ -20,11 +20,10 @@ HH_AREA_MOSCOW_CODE = "1"
 HH_VACANCY_PERIOD = "30"
 
 PROGRAMMING_LANGUAGES = (
-    # "JavaScript",
-    "Java",
-    "Python"
-    # "Ruby", "PHP", "C++",
-    # "C#", "Go", "Swift"
+    "JavaScript", "Java",
+    "Python", "C",
+    "Ruby", "PHP", "C++",
+    "C#", "Go",
 )
 
 
@@ -217,35 +216,30 @@ def calc_average_salary_language_sj(lang=""):
     ]
 
 
+def print_table(data, title=None):
+    headers = [
+        "Язык программирования", "Вакансий найдено",
+        "Вакансий обработано", "Средняя зарплата"
+    ]
+    table_data = [headers]
+    for item in data:
+        table_data.append(
+            list(map(str, item))
+        )
+    table = AsciiTable(table_data=table_data, title=title)
+    print(table.table)
+
+
 def main():
     avg_salaries_hh = _calc_average_salary_all_languages(
         calc_func=calc_average_salary_language_hh
     )
-    print(avg_salaries_hh)
-
     avg_salaries_sj = _calc_average_salary_all_languages(
         calc_func=calc_average_salary_language_sj
     )
-    print(avg_salaries_sj)
-    data = [
-        "Язык программирования","Вакансий найдено",
-        "Вакансий обработано", "Средняя зарплата"
-    ]
-    data.append(avg_salaries_hh)
-    data.append(avg_salaries_sj)
-    table = AsciiTable(data)
-    print(table.table)
 
-    # for lang_salary in avg_salaries:
-    #     for name in lang_salary.keys():
-    #         info = lang_salary[name]
-    #         print(
-    #             (
-    #                 f'{name} / found: {info["vacancies_found"]} /'
-    #                 f' processed: {info["vacancies_processed"]} /'
-    #                 f' avg salary: {info["average_salary"]} '
-    #             )
-    #         )
+    print_table(data=avg_salaries_hh, title="HeadHunter Moscow")
+    print_table(data=avg_salaries_sj, title="SuperJob Moscow")
 
 
 if __name__ == "__main__":
