@@ -5,6 +5,7 @@ from itertools import count
 import requests
 from dotenv import find_dotenv, load_dotenv
 from requests.compat import urljoin
+from terminaltables import AsciiTable
 
 SUPERJOB_AUTH_URL = "https://api.superjob.ru/2.0/oauth2/password/"
 SUPERJOB_VACANCIES_SEARCH_URL = "https://api.superjob.ru/2.0/vacancies/"
@@ -226,6 +227,14 @@ def main():
         calc_func=calc_average_salary_language_sj
     )
     print(avg_salaries_sj)
+    data = [
+        "Язык программирования","Вакансий найдено",
+        "Вакансий обработано", "Средняя зарплата"
+    ]
+    data.append(avg_salaries_hh)
+    data.append(avg_salaries_sj)
+    table = AsciiTable(data)
+    print(table.table)
 
     # for lang_salary in avg_salaries:
     #     for name in lang_salary.keys():
