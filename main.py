@@ -121,17 +121,17 @@ def calc_average_salary_language_hh(lang=""):
 
     return  [
         lang,
-        len(predicted_data),
+        _get_vacancies_found_number_hh(search_text=search_text),
         predicted_salaries_number,
         average_salary
     ]
 
 
 def _get_vacancies_found_number_hh(search_text=""):
-        """Число всех найденных по запросу вакансий."""
-        response = _get_vacancies_page_hh(search_text=search_text)
-        response.raise_for_status()
-        return response.json()["found"]
+    """Число всех найденных по запросу вакансий."""
+    response = _get_vacancies_page_hh(search_text=search_text)
+    response.raise_for_status()
+    return response.json()["found"]
 
 
 def _get_vacancies_page_sj(search_text="", page=0, count=100):
@@ -231,7 +231,7 @@ def calc_average_salary_language_sj(lang=""):
 
     return  [
         lang,
-        len(predicted_data),
+        _get_vacancies_found_number_sj(),
         predicted_salaries_number,
         average_salary
     ]
