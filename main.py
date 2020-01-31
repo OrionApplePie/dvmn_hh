@@ -73,7 +73,6 @@ def fetch_all_vacancies_hh(search_text="", start_page=0):
     for page in count(start_page):
         # print(f"fetch by search text: {search_text}, page: {page}")
         response = _get_vacancies_page_hh(search_text=search_text, page=page)
-        response.raise_for_status()
 
         page_data = response.json()
 
@@ -128,6 +127,45 @@ def calc_average_salary_language_hh(lang=""):
     ]
 
 
+def _get_vacancies_found_number_hh(search_text=""):
+        """Число всех найденных по запросу вакансий."""
+        response = _get_vacancies_page_hh(search_text=search_text)
+        response.raise_for_status()
+        return response.json()["found"]
+
+
+def _get_vacancies_page_sj(search_text="", page=0, count=100):
+    access_token = _auth_sj()
+    secret_key = os.getenv("SUPERJOB_SECRET_KEY")
+
+    headers = {
+        "X-Api-App-Id": secret_key,
+        "Content-Type": "application/x-www-form-urlencoded",  # TODO: нужно?
+        "Authorization": "Bearer " + access_token,
+    }
+    month_ago_date = dt.datetime.now() - dt.timedelta(days=SUPERJOB_VACANCIES_PERIOD)
+
+    params = {
+        "town": SUPERJOB_MOSKOW_ID,
+        "date_published_from": month_ago_date,
+        "keyword": search_text,
+        # "keywords": [[1, None, search_text], ],
+        # "catalogues": SUPERJOB_CATALOG_CODE,
+        "page": page,
+        "count": count,
+    }
+    page_response = requests.get(
+        url=SUPERJOB_VACANCIES_SEARCH_URL, headers=headers, params=params
+    )
+    page_response.raise_for_status()
+    return page_response
+
+
+def _get_vacancies_found_number_sj(search_text=""):
+    response = _get_vacancies_page_sj(search_text=search_text)
+    return response.json()["total"]
+
+
 def _auth_sj():
     """Авторизация по логину и паролю на superjob. Возвращает Access token."""
     secret_key = os.getenv("SUPERJOB_SECRET_KEY")
@@ -149,35 +187,10 @@ def _auth_sj():
 
 
 def fetch_all_vacancies_sj(search_text=""):
-    access_token = _auth_sj()
-    secret_key = os.getenv("SUPERJOB_SECRET_KEY")
-
-    headers = {
-        "X-Api-App-Id": secret_key,
-        "Content-Type": "application/x-www-form-urlencoded",  # TODO: нужно?
-        "Authorization": "Bearer " + access_token,
-    }
-    month_ago_date = dt.datetime.now() - dt.timedelta(days=SUPERJOB_VACANCIES_PERIOD)
-
-    params = {
-        "town": SUPERJOB_MOSKOW_ID,
-        "date_published_from": month_ago_date,
-        "keyword": search_text,
-        # "keywords": [[1, None, search_text], ],
-        # "catalogues": SUPERJOB_CATALOG_CODE,
-        "page": 0,
-        "count": 100,
-    }
     for page in count(0):
         if page > 4:
             break
-
-        params['page'] = page
-        response = requests.get(
-            url=SUPERJOB_VACANCIES_SEARCH_URL, headers=headers, params=params
-        )
-        response.raise_for_status()
-
+        response = _get_vacancies_page_sj(search_text=search_text, page=page, count=100)
         yield from response.json()["objects"]
 
 
