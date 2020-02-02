@@ -5,6 +5,7 @@ from itertools import count
 import requests
 from dotenv import find_dotenv, load_dotenv
 from requests.compat import urljoin
+from requests.exceptions import HTTPError
 from terminaltables import AsciiTable
 
 SUPERJOB_AUTH_URL = "https://api.superjob.ru/2.0/oauth2/password/"
@@ -19,6 +20,7 @@ HH_PROGRAMMER_SPEC_ID = "1.221"
 HH_AREA_MOSCOW_CODE = "1"
 HH_VACANCY_PERIOD = "30"
 
+SEARCH_TEXT_PART = "Программист"
 PROGRAMMING_LANGUAGES = (
     "JavaScript", "Java",
     "Python", "C",
@@ -27,7 +29,7 @@ PROGRAMMING_LANGUAGES = (
 )
 
 
-def _predict_salary(salary_from, salary_to):
+def predict_salary(salary_from, salary_to):
     """Вычисление средней зарплаты по границам 'вилки'."""
     average_salary = 0
 
@@ -43,13 +45,16 @@ def _predict_salary(salary_from, salary_to):
     return average_salary
 
 
-def _calc_average_salary_all_languages(calc_func=None, languages=PROGRAMMING_LANGUAGES):
+def calc_average_salary_all_languages(calc_func=None, languages=PROGRAMMING_LANGUAGES):
     """Сбор вакансий и вычисление средних зарплат
-    по всем заданным в списке языкам."""
-    return [calc_func(lang=lang) for lang in languages]
+    по всем заданным в списке языкам программирования."""
+    return [
+        calc_func(lang=lang)
+        for lang in languages
+    ]
 
 
-def _get_vacancies_page_hh(search_text="", page=0):
+def get_vacancies_page_hh(search_text="", page=0):
     """Запрашивает /response API hh.ru и возвращает response вакансий страницы."""
 
     query_params = {
@@ -69,10 +74,10 @@ def _get_vacancies_page_hh(search_text="", page=0):
 
 
 def fetch_all_vacancies_hh(search_text="", start_page=0):
-    """Fetch all response from every pages. (API limit is 2000)."""
+    """Запрос всех вакансий по поисковому запросу с каждой страницы 
+    (hh.ru, ограничение API - 2000 результатов)."""
     for page in count(start_page):
-        # print(f"fetch by search text: {search_text}, page: {page}")
-        response = _get_vacancies_page_hh(search_text=search_text, page=page)
+        response = get_vacancies_page_hh(search_text=search_text, page=page)
 
         page_data = response.json()
 
@@ -83,9 +88,9 @@ def fetch_all_vacancies_hh(search_text="", start_page=0):
 
 
 def predict_rub_salary_hh(vacancy=None):
-    """Calculate average salary of given hh vacancy
-    or return None if no information of salary.
-    Process only if currency is RUR."""
+    """Вычисление средней зарплаты вакансии с hh.ru,
+    возвращает None если нет информации о зарплате,
+    обрабатывает только зарплаты в рублях RUR."""
 
     salary = vacancy["salary"]
 
@@ -98,12 +103,12 @@ def predict_rub_salary_hh(vacancy=None):
     salary_from = salary["from"]
     salary_to = salary["to"]
 
-    return int(_predict_salary(salary_from, salary_to)) or None
+    return int(predict_salary(salary_from, salary_to)) or None
 
 
 def calc_average_salary_language_hh(lang=""):
-    """Caclculate average salary of response by given language."""
-    search_text = "Программист" + lang
+    """Вычисление средней зарплаты по найденным вакансиям hh.ru из списка."""
+    search_text = " ".join([SEARCH_TEXT_PART, lang])
     all_vacancies = fetch_all_vacancies_hh(search_text=search_text)
 
     predicted_data = [
@@ -121,26 +126,47 @@ def calc_average_salary_language_hh(lang=""):
 
     return  [
         lang,
-        _get_vacancies_found_number_hh(search_text=search_text),
+        get_vacancies_found_number_hh(search_text=search_text),
         predicted_salaries_number,
         average_salary
     ]
 
 
-def _get_vacancies_found_number_hh(search_text=""):
-    """Число всех найденных по запросу вакансий."""
-    response = _get_vacancies_page_hh(search_text=search_text)
+def get_vacancies_found_number_hh(search_text=""):
+    """Число всех найденных по запросу вакансий hh.ru."""
+    response = get_vacancies_page_hh(search_text=search_text)
     response.raise_for_status()
     return response.json()["found"]
 
 
-def _get_vacancies_page_sj(search_text="", page=0, count=100):
-    access_token = _auth_sj()
+def auth_sj():
+    """Авторизация по логину и паролю на SuperJob. Возвращает Access token."""
+    secret_key = os.getenv("SUPERJOB_SECRET_KEY")
+    app_id = os.getenv("SUPERJOB_APP_ID")
+    login = os.getenv("SUPERJOB_LOGIN")
+    passwd = os.getenv("SUPERJOB_PASSWORD")
+
+    params = {
+        "login": login,
+        "password": passwd,
+        "client_id": app_id,
+        "client_secret": secret_key,
+        "hr": 0,
+    }
+    response = requests.get(url=SUPERJOB_AUTH_URL, params=params)
+    response.raise_for_status()
+
+    return response.json()["access_token"]
+
+
+def get_vacancies_page_sj(search_text="", page=0, count=100):
+    """Запрашивает API SuperJob и возвращает response вакансий страницы."""
+    access_token = auth_sj()
     secret_key = os.getenv("SUPERJOB_SECRET_KEY")
 
     headers = {
         "X-Api-App-Id": secret_key,
-        "Content-Type": "application/x-www-form-urlencoded",  # TODO: нужно?
+        # "Content-Type": "application/x-www-form-urlencoded",  # TODO: нужно?
         "Authorization": "Bearer " + access_token,
     }
     month_ago_date = dt.datetime.now() - dt.timedelta(days=SUPERJOB_VACANCIES_PERIOD)
@@ -161,43 +187,29 @@ def _get_vacancies_page_sj(search_text="", page=0, count=100):
     return page_response
 
 
-def _get_vacancies_found_number_sj(search_text=""):
-    response = _get_vacancies_page_sj(search_text=search_text)
+def get_vacancies_found_number_sj(search_text=""):
+    """Число всех найденных по запросу вакансий SuperJob."""
+    response = get_vacancies_page_sj(search_text=search_text)
     return response.json()["total"]
 
 
-def _auth_sj():
-    """Авторизация по логину и паролю на superjob. Возвращает Access token."""
-    secret_key = os.getenv("SUPERJOB_SECRET_KEY")
-    app_id = os.getenv("APP_ID")
-    login = os.getenv("LOGIN")
-    passwd = os.getenv("PASSWORD")
-
-    params = {
-        "login": login,
-        "password": passwd,
-        "client_id": app_id,
-        "client_secret": secret_key,
-        "hr": 0,
-    }
-    response = requests.get(url=SUPERJOB_AUTH_URL, params=params)
-    response.raise_for_status()
-
-    return response.json()["access_token"]
-
-
-def fetch_all_vacancies_sj(search_text="", max_pages=4, vacancies_count=100):
+def fetch_all_vacancies_sj(search_text="", max_pages=5, vacancies_count=100):
+    """Запрос всех вакансий по поисковому запросу с каждой старницы 
+    (SuperJob, ограничение API - 500 результатов)."""
     for page in count(0):
-        if page > max_pages:
+        if page > max_pages - 1:
             break
-        response = _get_vacancies_page_sj(
+        vacancies_page = get_vacancies_page_sj(
             search_text=search_text,
             page=page, count=vacancies_count
         )
-        yield from response.json()["objects"]
+        yield from vacancies_page.json()["objects"]
 
 
 def predict_rub_salary_sj(vacancy=None):
+    """Вычисление средней зарплаты вакансии с SuperJob,
+    возвращает None если нет информации о зарплате,
+    обрабатывает только зарплаты в рублях rub."""
     salary_from = vacancy["payment_from"]
     salary_to = vacancy["payment_to"]
 
@@ -206,12 +218,12 @@ def predict_rub_salary_sj(vacancy=None):
     if vacancy["currency"] != "rub":
         return None
 
-    return int(_predict_salary(salary_from, salary_to)) or None
+    return int(predict_salary(salary_from, salary_to)) or None
 
 
 def calc_average_salary_language_sj(lang=""):
-    search_text = "Программист" + lang
-
+    """Вычисление средней зарплаты по найденным вакансиям SuperJob из списка."""
+    search_text = " ".join([SEARCH_TEXT_PART, lang])
     vacancies = fetch_all_vacancies_sj(search_text)
     average_salary = 0
     processed_vacancies = 0
@@ -231,13 +243,14 @@ def calc_average_salary_language_sj(lang=""):
 
     return  [
         lang,
-        _get_vacancies_found_number_sj(),
+        get_vacancies_found_number_sj(search_text),
         predicted_salaries_number,
         average_salary
     ]
 
 
 def print_table(data, title=None):
+    """Вывод таблицы результатов в консоль."""
     headers = [
         "Язык программирования", "Вакансий найдено",
         "Вакансий обработано", "Средняя зарплата"
@@ -252,14 +265,19 @@ def print_table(data, title=None):
 
 
 def main():
-    # r = calc_average_salary_language_sj("Менеджер по продажам")
-    # print(r)
-    avg_salaries_hh = _calc_average_salary_all_languages(
-        calc_func=calc_average_salary_language_hh
-    )
-    avg_salaries_sj = _calc_average_salary_all_languages(
-        calc_func=calc_average_salary_language_sj
-    )
+    try:
+        avg_salaries_hh = calc_average_salary_all_languages(
+            calc_func=calc_average_salary_language_hh
+        )
+    except HTTPError as error:
+        exit("Невозможно получить данные с сервера:\n{0}\n".format(error))
+
+    try:
+        avg_salaries_sj = calc_average_salary_all_languages(
+            calc_func=calc_average_salary_language_sj
+        )
+    except HTTPError as error:
+        exit("Невозможно получить данные с сервера:\n{0}\n".format(error))
 
     print_table(data=avg_salaries_hh, title="HeadHunter Moscow")
     print_table(data=avg_salaries_sj, title="SuperJob Moscow")
